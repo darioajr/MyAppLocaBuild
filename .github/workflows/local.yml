@@ -1,0 +1,75 @@
+name: MSBuild
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  SOLUTION_FILE_PATH: .
+  BUILD_CONFIGURATION_RELEASE: Release
+  BUILD_CONFIGURATION_DEBUG: Debug
+  BUILD_PLATFORM: x64
+  BUILD_PLATFORM_TOOLSET: v143
+  BUILD_WINDOWS_PLATFORM_VERSION: 10.0
+  OUTPUT_DIR: ${{ github.workspace }}\out
+  PACKAGE_VERSION: 1.0.${{ github.run_number }}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Build Release
+      run: |
+        msbuild ${{ env.SOLUTION_FILE_PATH }} /m /p:Configuration=${{ env.BUILD_CONFIGURATION_RELEASE }} `
+        /p:Platform=${{ env.BUILD_PLATFORM }} `
+        /p:PlatformToolset=${{ env.BUILD_PLATFORM_TOOLSET }} `
+        /p:WindowsTargetPlatformVersion=${{ env.BUILD_WINDOWS_PLATFORM_VERSION }} `
+        /p:OutDir=${{ env.OUTPUT_DIR }}\Release
+
+    - name: Build Debug
+      run: |
+        msbuild ${{ env.SOLUTION_FILE_PATH }} /m /p:Configuration=${{ env.BUILD_CONFIGURATION_DEBUG }} `
+        /p:Platform=${{ env.BUILD_PLATFORM }} `
+        /p:PlatformToolset=${{ env.BUILD_PLATFORM_TOOLSET }} `
+        /p:WindowsTargetPlatformVersion=${{ env.BUILD_WINDOWS_PLATFORM_VERSION }} `
+        /p:OutDir=${{ env.OUTPUT_DIR }}\Debug
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Build-Output
+        path: |
+          ${{ env.OUTPUT_DIR }}\Release\*
+          ${{ env.OUTPUT_DIR }}\Debug\*
+  
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        name: Release ${{ env.PACKAGE_VERSION }}
+        tag_name: v${{ env.PACKAGE_VERSION }}
+        files: |
+          ${{ env.OUTPUT_DIR }}\Release\*.exe
+          ${{ env.OUTPUT_DIR }}\Release\*.dll
+          ${{ env.OUTPUT_DIR }}\Debug\*.exe
+          ${{ env.OUTPUT_DIR }}\Debug\*.dll
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        make_latest: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+  
